@@ -1,15 +1,29 @@
 import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Document from "./pages/Document";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home/Home";
+import { useAuth } from "./context/AuthProvider";
+import PageLoader from "./components/PageLoader";
+import { Suspense, lazy } from "react";
+
+const Document = lazy(() => import("./pages/Document/Document"));
+
 const App = () => {
-  return (
+  const { isLoading } = useAuth();
+
+  return isLoading ? (
+    <PageLoader />
+  ) : (
     <BrowserRouter>
       <Routes>
-        <Route path="/document/:id" element={<Document />} />
         <Route
-          path="/"
-          element={<Navigate to={`/document/${crypto.randomUUID()}`} />}
+          path="/document/:id"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <Document />
+            </Suspense>
+          }
         />
+        <Route path="/" element={<Home />} />
       </Routes>
     </BrowserRouter>
   );
