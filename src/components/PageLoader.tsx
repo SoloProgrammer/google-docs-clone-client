@@ -1,6 +1,6 @@
 const PageLoader = () => {
   return (
-    <div className="z-10 min-h-screen w-full fixed top-0 left-0 bg-[#f7f7f7] flex items-center justify-center">
+    <div className="z-10 min-h-screen w-full fixed top-0 left-0 bg-white flex items-center justify-center">
       <Loader />
     </div>
   );
@@ -12,7 +12,7 @@ type LoaderProps = {
 export const Loader = ({ w = 150 }: LoaderProps) => (
   <img
     width={w}
-    src="https://sarabloxsomemotiongraphics.files.wordpress.com/2018/09/google-loading-gif-11.gif"
+    src="loading.gif"
     alt="loading"
   />
 );
