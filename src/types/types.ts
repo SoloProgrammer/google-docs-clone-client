@@ -1,3 +1,10 @@
+export type User = {
+  _id: string;
+  name: string;
+  email: string;
+  googleId: string;
+  avatar: string;
+};
 export type Session = {
   user: User | null;
   isLoading: true | false;
@@ -11,11 +18,4 @@ export type Document = {
   data: Object;
   title: string;
   updatedAt: string;
-};
-export type User = {
-  _id: string;
-  name: string;
-  email: string;
-  googleId: string;
-  avatar: string;
 };
