@@ -1,19 +1,20 @@
 import styles from "./Home.module.css";
-import { LuMenu } from "react-icons/lu";
 import { GrGrid } from "react-icons/gr";
 import { LiaThListSolid } from "react-icons/lia";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { LOGIN_URI, SERVER_URL } from "../../constants/urls";
 import { useAuth } from "../../context/AuthProvider";
 import PageLoader, { Loader } from "../../components/PageLoader";
 import { useAxios } from "use-axios-http-requests-ts";
 import { Document } from "../../types/types";
-import { HiOutlineDotsVertical } from "react-icons/hi";
-import { FaUserGroup } from "react-icons/fa6";
+import DocumentsList from "../../components/DocumentsList";
+import { TbCaretDownFilled } from "react-icons/tb";
+import { MdOutlineCheck } from "react-icons/md";
+import Navbar from "../../components/HomeNavbar/Navbar";
 
 const Home = () => {
-  const { isAuthenticated, user, isLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const NEW_DOCUMENT_URI = `/document/${crypto.randomUUID()}`;
@@ -32,72 +33,74 @@ const Home = () => {
   type ApiResponse = {
     documents: Array<Document>;
   };
-  const DOCUMENTS_URI = `${SERVER_URL}/api/documents`;
+
+  const FILTER_OPTIONS = ["Owned by anyone", "Owned by me", "Not owned by me"];
+  const [selectedOption, setSelectedOption] = useState<string>(
+    FILTER_OPTIONS[0]
+  );
+  const [open, setOpen] = useState(false);
+
+  const handleCloseFilterOptions = () => setOpen(false);
+
+  const DOCUMENTS_URI = `${SERVER_URL}/api/documents?filterby=${selectedOption}`;
   const { data, loading: loadingDocuments } = useAxios<ApiResponse>(
     DOCUMENTS_URI,
-    [],
+    [selectedOption],
     {
       withCredentials: true,
     }
   );
 
+  function isDocumentsEmpty() {
+    return !data || data.documents.length < 1;
+  }
+
   return (
     <div className={styles.container}>
       {loading && <PageLoader />}
-      <nav className={styles.nav}>
-        <div className={styles.left}>
-          <span className={styles.IconBtn}>
-            <LuMenu />
-          </span>
-          <div className={styles.logo}>
-            <img
-              width={35}
-              src="https://cdn.iconscout.com/icon/free/png-256/free-google-docs-7662284-6297220.png"
-              alt="logo"
-            />
-            <span>Docs</span>
-          </div>
-        </div>
-        <div className={styles.search}>
-          <input type="text" placeholder="Search" />
-        </div>
-        <div className={styles.profile}>
-          {!isLoading ? (
-            !isAuthenticated ? (
-              <>
-                <a
-                  href={LOGIN_URI}
-                  className="shadow-md px-6 py-2 rounded-sm hover:border-transparent text-gray-700 hover:bg-gray-100  flex items-center gap-2"
-                >
-                  <span>Login</span>
-                  <img
-                    width={18}
-                    src="https://cdn.iconscout.com/icon/free/png-256/free-google-1772223-1507807.png"
-                    alt=""
-                  />
-                </a>
-              </>
-            ) : (
-              <>
-                <img src={user?.avatar} alt="profile" />
-              </>
-            )
-          ) : (
-            <></>
-          )}
-        </div>
-      </nav>
+      <Navbar />
       <div className={styles.start}>
         <h1>Start a new document</h1>
-        <img
-          onClick={handleNewDocument}
-          src="https://ssl.gstatic.com/docs/templates/thumbnails/docs-blank-googlecolors.png"
-          alt="blank_page"
-        />
+        <div className="min-h-52 min-w-10">
+          <img
+            onClick={handleNewDocument}
+            src="https://ssl.gstatic.com/docs/templates/thumbnails/docs-blank-googlecolors.png"
+            alt="blank_page"
+          />
+        </div>
       </div>
       <div className={styles.documents}>
-        <div className={styles.top}>
-          <h1 className="font-medium">Recent Documents</h1>
+        <div className="flex">
+          <h1 className="flex-1 text-gray-700 font-[500] ml-4">
+            Recent Documents
+          </h1>
+          <div
+            tabIndex={1}
+            onBlur={handleCloseFilterOptions}
+            className="flex text-slate-700 tracking-wider text-[14px] ml-0 flex-[1]"
+          >
+            <div
+              onClick={() => {
+                setOpen((prev) => !prev);
+              }}
+              className={`relative px-3 cursor-pointer flex gap-2 items-center rounded-sm ${
+                open ? "bg-blue-100" : "hover:bg-gray-100"
+              }`}
+            >
+              <span>{selectedOption}</span>
+              <span>
+                <TbCaretDownFilled className="text-gray-500" />
+              </span>
+              {open && (
+                <FilterOptions
+                  selectedOption={selectedOption}
+                  options={FILTER_OPTIONS}
+                  setSelectedOption={setSelectedOption}
+                />
+              )}
+            </div>
+            <div className="ml-[3rem]">Created At</div>
+          </div>
           <div className={styles.actions}>
             <span className={styles.listIcon}>
               <LiaThListSolid />
@@ -108,8 +111,10 @@ const Home = () => {
           </div>
         </div>
         {loadingDocuments ? (
-          <Loader />
-        ) : !data ? (
+          <div className="flex justify-center mt-20">
+            <Loader />
+          </div>
+        ) : !data || isDocumentsEmpty() ? (
           <div className="py-10 shadow-md mt-10 text-center">
             <p className="text-xl">No text documents yet</p>
             <p className="text-gray-600 pt-2">
@@ -118,41 +123,44 @@ const Home = () => {
             </p>
           </div>
         ) : (
-          <div className="mt-10">
-            {data?.documents.map((doc) => (
-              <Link to={`/document/${doc._id}`} key={doc._id}>
-                <div className="cursor-pointer flex w-full items-center py-2 px-5 transitio hover:bg-[#e8f0fe] ">
-                  <div className=" flex flex-[3]">
-                    <div>
-                      <img width={20} src="file.png" alt="logo" />
-                    </div>
-                    <p className="pl-7 text-sm tracking-wider">
-                      {doc.title || "Untitled document"}
-                    </p>
-                    {doc.collaborators.length > 0 && (
-                      <FaUserGroup className="ml-4 text-gray-400 text-xl" />
-                    )}
-                  </div>
-                  <div className="flex flex-[2] justify-between">
-                    <p className="text-gray-500">
-                      {doc.author.name === user?.name ? "me" : doc.author.name}
-                    </p>
-                    <p className="mr-20 text-sm text-gray-500 tracking-wider">
-                      {new Date(doc.createdAt).toLocaleTimeString()}
-                    </p>
-                  </div>
-                  <div className="flex-[1] flex justify-end text-[22px] text-slate-600">
-                    <span className="p-2 rounded-full hover:bg-gray-300">
-                      <HiOutlineDotsVertical />
-                    </span>
-                  </div>
-                </div>
-                <hr className="border-[1px] border-b border-[#e3e3e3]" />
-              </Link>
-            ))}
-          </div>
+          <DocumentsList documents={data.documents} />
         )}
       </div>
+    </div>
+  );
+};
+
+type FilterOptionsProps = {
+  options: Array<string>;
+  selectedOption: string;
+  setSelectedOption: React.Dispatch<React.SetStateAction<string>>;
+};
+
+const FilterOptions = ({
+  options,
+  selectedOption,
+  setSelectedOption,
+}: FilterOptionsProps) => {
+  return (
+    <div className="whitespace-nowrap bg-white absolute shadow-md border-t border-gray-200 flex flex-col py-2 top-[-135px] left-[-20px]">
+      {options.map((op) => (
+        <span
+          onClick={() => setSelectedOption(op)}
+          key={op}
+          className="px-10 py-2 hover:bg-gray-100 relative"
+        >
+          <span
+            className={`${selectedOption === op ? "text-black font-bold" : ""}`}
+          >
+            {op}
+          </span>
+          {selectedOption === op && (
+            <span className="absolute left-2 top-2 text-xl">
+              <MdOutlineCheck />
+            </span>
+          )}{" "}
+        </span>
+      ))}
     </div>
   );
 };
