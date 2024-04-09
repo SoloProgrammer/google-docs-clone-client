@@ -30,6 +30,9 @@ const Home = () => {
     }
   };
 
+  console.log(SERVER_URL,"Server urls");
+  
+
   type ApiResponse = {
     documents: Array<Document>;
   };
