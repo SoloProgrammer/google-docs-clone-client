@@ -11,6 +11,12 @@ import Avatar from "@mui/material/Avatar";
 import AvatarGroup from "@mui/material/AvatarGroup";
 import { Link } from "react-router-dom";
 import { Tooltip } from "@mui/material";
+import { useAxiosFn } from "use-axios-http-requests-ts";
+import { DOCUMENT_URI } from "../constants/urls";
+import { BsCloudCheck } from "react-icons/bs";
+import { LuRefreshCcw } from "react-icons/lu";
+import { BiCaretDown } from "react-icons/bi";
+import { IoLinkSharp, IoShareSocialSharp } from "react-icons/io5";
 
 type TextEditorProps = {
   documentId: string;
@@ -28,6 +34,7 @@ const TextEditor = ({ documentId }: TextEditorProps) => {
   const [collaborators, setCollaborators] = useState<Array<Partial<User>> | []>(
     []
   );
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const s = io(SERVER_URL);
@@ -72,13 +79,22 @@ const TextEditor = ({ documentId }: TextEditorProps) => {
     if (!socket) return;
 
     const ReceiveChangesHandler = (changes: DeltaStatic) => {
+      console.log("changes receiving");
+
       const editor = quillRef.current?.getEditor();
       editor?.updateContents(changes);
     };
+    const ChangesSavedHandler = () => setSaving(false);
+    const SavingChangesHandler = () => setSaving(true);
+
     socket.on("receive-changes", ReceiveChangesHandler);
+    socket.on("changes-saved", ChangesSavedHandler);
+    socket.on("saving-changes", SavingChangesHandler);
 
     return () => {
       socket.off("receive-changes", ReceiveChangesHandler);
+      socket.off("changes-saved", ChangesSavedHandler);
+      socket.off("saving-changes", SavingChangesHandler);
     };
   }, [socket]);
 
@@ -107,8 +123,10 @@ const TextEditor = ({ documentId }: TextEditorProps) => {
     if (source !== "user") return;
 
     setDelta(delta);
+    setSaving(true);
 
     if (socket) {
+      socket.emit("saving-changes");
       socket.emit("send-changes", delta);
     }
   };
@@ -116,9 +134,11 @@ const TextEditor = ({ documentId }: TextEditorProps) => {
   return (
     <div>
       <TopBar
+        isSaving={saving}
         collaborators={collaborators}
-        title={document?.title}
+        title={document?.title || ""}
         documentId={documentId}
+        sharedCount={document?.collaborators.length!}
       />
       <ReactQuill
         ref={quillRef}
@@ -130,22 +150,51 @@ const TextEditor = ({ documentId }: TextEditorProps) => {
 };
 
 type TopBarProps = {
-  title: string | undefined;
+  title: string;
   documentId: string;
   collaborators: Array<Partial<User>>;
+  isSaving: boolean;
+  sharedCount: number;
 };
 
-const TopBar = ({ title: value, collaborators }: TopBarProps) => {
+var isFirstRender = true;
+
+const TopBar = ({
+  title: value,
+  collaborators,
+  documentId,
+  isSaving,
+  sharedCount,
+}: TopBarProps) => {
   const [title, setTitle] = useState<string>(value || DEFUALT_DOCUMENT_TITLE);
   const handleTitleChange = (e: ChangeEvent<HTMLInputElement>) =>
     setTitle(e.target.value);
 
-  const debouncedValue = useDebounce(title, 500);
-
   useEffect(() => {
-    if (title.trim().length < 1 || title.trim() === DEFUALT_DOCUMENT_TITLE)
+    setTitle(value);
+  }, [value]);
+
+  const { execute: renameDocument, loading } = useAxiosFn(
+    `${DOCUMENT_URI}?title=${title}&documentId=${documentId}`,
+    {
+      method: "PUT",
+      withCredentials: true,
+    },
+    [title]
+  );
+  const debouncedValue = useDebounce(title, 500);
+  useEffect(() => {
+    if (
+      title.trim().length < 1 ||
+      title.trim() === DEFUALT_DOCUMENT_TITLE ||
+      isFirstRender
+    ) {
+      setTimeout(() => {
+        isFirstRender = false;
+      }, 1000);
       return;
-    console.log(debouncedValue);
+    }
+    renameDocument();
   }, [debouncedValue]);
 
   return (
@@ -175,15 +224,38 @@ const TopBar = ({ title: value, collaborators }: TopBarProps) => {
             type="text"
           />
         </div>
+        <div className="flex items-center text-gray-500 gap-2">
+          {!loading && !isSaving ? (
+            <Tooltip title="Document saved to cloud">
+              <span className="flex items-center gap-2">
+                <BsCloudCheck className="text-xl" />
+                <span className="select-none">saved</span>
+              </span>
+            </Tooltip>
+          ) : (
+            <>
+              <LuRefreshCcw className="text-xl" />
+              <span className="select-none">saving....</span>
+            </>
+          )}
+        </div>
       </div>
-      <div>
+      <div className="flex gap-10">
+        <ShareButton sharedCount={sharedCount} />
         <AvatarGroup max={4}>
           {collaborators.map((user) => (
-            <Tooltip title={user.name}>
+            <Tooltip
+              key={user._id}
+              title={
+                <span className="flex flex-col items-center">
+                  <span>{user.name}</span>
+                  <span>{user.email}</span>
+                </span>
+              }
+            >
               <Avatar
                 sx={{ width: "35px", height: "35px" }}
                 className="!border-[3px] !border-green-500"
-                key={user._id}
                 alt="Remy Sharp"
                 src={user.avatar}
               />
@@ -192,6 +264,49 @@ const TopBar = ({ title: value, collaborators }: TopBarProps) => {
         </AvatarGroup>
       </div>
     </div>
+  );
+};
+
+type ShareButtonProps = {
+  sharedCount: number;
+};
+
+const ShareButton = ({ sharedCount }: ShareButtonProps) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        setOpen(!open);
+      }}
+      tabIndex={1}
+      onBlur={() => {
+        setOpen(false);
+      }}
+      className="relative flex items-center hover:!bg-[#b2d7ef] bg-[#c2e7ff] px-3 pl-4 rounded-[45px]"
+    >
+      {open && (
+        <div className="min-w-56 top-[50px] right-[10px] absolute shadow-lg py-1 roudned-md bg-white border-t border-gray-200">
+          <div className="px-3 gap-2 flex items-center py-2 hover:bg-gray-100">
+            <span>
+              <IoLinkSharp />
+            </span>
+            <span className="text-sm">Copy link</span>
+          </div>
+          <hr />
+          <div className="!cursor-auto text-left py-4 px-2 text-xs text-gray-600">
+            Shared with {sharedCount} peoples
+          </div>
+        </div>
+      )}
+      <span className="flex gap-1 items-center">
+        <IoShareSocialSharp className="text-gray-800 mr-1" />
+        <span className="text-slate-800 text-sm tracking-wide">Share</span>
+      </span>
+      <span className="w-[1px] bg-white h-full mx-2" />
+      <span className="pl-0">
+        <BiCaretDown className="text-sm" />
+      </span>
+    </button>
   );
 };
 

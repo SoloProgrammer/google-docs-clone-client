@@ -12,7 +12,7 @@ type LoaderProps = {
 export const Loader = ({ w = 150 }: LoaderProps) => (
   <img
     width={w}
-    src="loading.gif"
+    src="/loading.gif"
     alt="loading"
   />
 );
