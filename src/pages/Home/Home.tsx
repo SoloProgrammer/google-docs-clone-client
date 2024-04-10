@@ -150,7 +150,9 @@ const FilterOptions = ({
           className="px-10 py-2 hover:bg-gray-100 relative"
         >
           <span
-            className={`select-none ${selectedOption === op ? "text-black font-bold" : ""}`}
+            className={`select-none ${
+              selectedOption === op ? "text-black font-bold" : ""
+            }`}
           >
             {op}
           </span>
